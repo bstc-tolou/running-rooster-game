@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Lalezar", "Vazirmatn", sans-serif;
+  --font-body: "Vazirmatn", sans-serif;
+  --color-farm-900: #072314;
+  --color-farm-800: #0c3320;
+  --color-farm-700: #14532d;
+  --color-farm-600: #1e7a3f;
+  --color-grass: #4cb944;
+  --color-gold: #ffc93c;
+  --color-gold-deep: #f59e0b;
+  --color-cream: #fff6e0;
+  --color-comb: #e5342b;
+  --color-beak: #ff9f1c;
+}
+
+html,
+body {
+  font-family: var(--font-body);
+  background: #072314;
+  color: #fff6e0;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* ── chunky game button ─────────────────────────── */
+.btn-game {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  border-radius: 14px;
+  border: 3px solid rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    filter 0.12s ease;
+  cursor: pointer;
+}
+.btn-game:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 0 rgba(0, 0, 0, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-game:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* ── HUD wooden/leafy panel ─────────────────────── */
+.hud-panel {
+  background: linear-gradient(180deg, rgba(12, 51, 32, 0.92), rgba(7, 35, 20, 0.92));
+  border: 2px solid rgba(255, 201, 60, 0.55);
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+}
+
+.effect-bar {
+  transition: width 0.1s linear;
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.6) translateY(24px);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.05) translateY(-3px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+.pop-in {
+  animation: pop-in 0.42s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(2deg);
+  }
+}
+.bob {
+  animation: bob 1.6s ease-in-out infinite;
+}
+
+@keyframes title-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 4px 0 #7a3c00,
+      0 0 26px rgba(255, 201, 60, 0.55);
+  }
+  50% {
+    text-shadow:
+      0 4px 0 #7a3c00,
+      0 0 46px rgba(255, 201, 60, 0.9);
+  }
+}
+.title-glow {
+  animation: title-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes record-flash {
+  0%,
+  100% {
+    transform: scale(1) rotate(-2deg);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.12) rotate(2deg);
+    filter: brightness(1.35);
+  }
+}
+.record-flash {
+  animation: record-flash 0.7s ease-in-out infinite;
+}
+
+@keyframes marquee-stripes {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 48px 0;
+  }
+}
+.stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.14) 0 12px,
+    transparent 12px 24px
+  );
+  animation: marquee-stripes 1.2s linear infinite;
+}

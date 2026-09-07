@@ -416,16 +416,14 @@ export class Engine {
       }
     }
 
-    // spawn obstacles
+    // spawn obstacles (pattern-driven)
     this.obsT -= dt;
     if (this.obsT <= 0) {
-      this.spawnObstacle(worldSpeed);
-      this.obsT = Math.max(0.46, rand(0.62, 1.2) - this.elapsed * 0.006);
+      this.spawnPattern(worldSpeed);
     }
     this.foodT -= dt;
     if (this.foodT <= 0) {
-      this.spawnFood();
-      this.foodT = rand(0.5, 1.05);
+      this.spawnFoodChain();
     }
 
     // move entities
@@ -487,19 +485,8 @@ export class Engine {
   }
 
   /* ── spawning ────────────────────────────────── */
-  private spawnObstacle(worldSpeed: number) {
+  private makeObstacle(kind: Obstacle["kind"], x: number): Obstacle {
     const u = this.u;
-    const last = this.obstacles[this.obstacles.length - 1];
-    if (last && last.x > this.W - worldSpeed * 0.42) {
-      this.obsT = 0.14;
-      return;
-    }
-    const kind = pick<Obstacle["kind"]>([
-      ["rock", 32],
-      ["fence", 30],
-      ["crow", 20],
-      ["hay", 18],
-    ]);
     let w = 0, h = 0, y = 0;
     if (kind === "rock") {
       w = rand(40, 52) * u;
@@ -518,31 +505,163 @@ export class Engine {
       h = 30 * u;
       y = this.groundY - rand(88, 116) * u;
     }
-    this.obstacles.push({ kind, x: this.W + 60 * u, y, w, h, phase: rand(0, 6) });
+    return { kind, x, y, w, h, phase: rand(0, 6) };
   }
 
-  private spawnFood() {
+  private spawnPattern(worldSpeed: number) {
     const u = this.u;
-    const kind = pick<FoodKind>([
-      ["worm", 19],
-      ["beetle", 14],
-      ["butterfly", 12],
-      ["chili", 12],
-      ["mushroom", 11],
-      ["corn", 10],
-      ["note", 10],
-      ["egg", 6],
-      ["apple", 6],
-    ]);
-    const air = kind === "butterfly" || kind === "note" || (kind === "egg" && Math.random() < 0.6);
-    const baseX = this.W + rand(60, 200) * u;
-    const y = air
-      ? this.groundY - rand(130, 215) * u
-      : this.groundY - 26 * u;
-    const row = kind === "worm" || kind === "beetle" ? 3 : 1;
-    for (let i = 0; i < row; i++) {
-      this.foods.push({ kind, x: baseX + i * 54 * u, y, phase: rand(0, 6) });
+    const elapsed = this.elapsed;
+    const last = this.obstacles[this.obstacles.length - 1];
+    // safe window: never too close to last obstacle
+    const minGap = worldSpeed * 0.9;
+    if (last && last.x > this.W - minGap) {
+      this.obsT = 0.18;
+      return;
     }
+    const baseX = this.W + 40 * u;
+
+    // difficulty tiers
+    const tier = elapsed < 12 ? 0 : elapsed < 30 ? 1 : elapsed < 55 ? 2 : 3;
+
+    // pick a pattern
+    type Pattern = () => { obs: Obstacle[]; foods: { kind: FoodKind; x: number; y: number }[]; gap: number };
+    const patterns: { fn: Pattern; w: number; minTier: number; maxTier?: number }[] = [
+      // Tutorial — single rock + worm (first 12 seconds only)
+      { minTier: 0, maxTier: 0, w: 60, fn: () => {
+        const obs = [this.makeObstacle("rock", baseX)];
+        const foods = [{ kind: "worm" as FoodKind, x: baseX + 120 * u, y: this.groundY - 26 * u }];
+        return { obs, foods, gap: 1.8 };
+      }},
+      // Tier 0 — easy single obstacle + reward
+      { minTier: 0, w: 40, fn: () => {
+        const obs = [this.makeObstacle("rock", baseX)];
+        const foods = [{ kind: "worm" as FoodKind, x: baseX + 140 * u, y: this.groundY - 26 * u }];
+        return { obs, foods, gap: 1.55 };
+      }},
+      // Tier 0 — fence with butterfly arc reward
+      { minTier: 0, w: 30, fn: () => {
+        const obs = [this.makeObstacle("fence", baseX)];
+        const foods: { kind: FoodKind; x: number; y: number }[] = [];
+        for (let i = 0; i < 4; i++) {
+          const t = i / 3;
+          foods.push({
+            kind: "butterfly",
+            x: baseX + (60 + i * 52) * u,
+            y: this.groundY - (90 + Math.sin(t * Math.PI) * 70) * u,
+          });
+        }
+        return { obs, foods, gap: 1.7 };
+      }},
+      // Tier 1 — double rock with gap reward
+      { minTier: 1, w: 22, fn: () => {
+        const obs = [
+          this.makeObstacle("rock", baseX),
+          this.makeObstacle("rock", baseX + rand(180, 220) * u),
+        ];
+        const foods = [{ kind: "beetle" as FoodKind, x: baseX + 100 * u, y: this.groundY - 26 * u }];
+        return { obs, foods, gap: 1.65 };
+      }},
+      // Tier 1 — reward after jump (chili above fence)
+      { minTier: 1, w: 22, fn: () => {
+        const obs = [this.makeObstacle("fence", baseX)];
+        const foods = [{ kind: "chili" as FoodKind, x: baseX + 30 * u, y: this.groundY - 135 * u }];
+        return { obs, foods, gap: 1.8 };
+      }},
+      // Tier 1 — worm row on ground
+      { minTier: 0, w: 25, fn: () => {
+        const foods: { kind: FoodKind; x: number; y: number }[] = [];
+        for (let i = 0; i < 5; i++) {
+          foods.push({ kind: "worm", x: baseX + i * 48 * u, y: this.groundY - 26 * u });
+        }
+        return { obs: [], foods, gap: 1.1 };
+      }},
+      // Tier 2 — crow + mushroom reward (fly over)
+      { minTier: 2, w: 18, fn: () => {
+        const obs = [this.makeObstacle("crow", baseX)];
+        const foods = [{ kind: "mushroom" as FoodKind, x: baseX + 20 * u, y: this.groundY - 160 * u }];
+        return { obs, foods, gap: 1.85 };
+      }},
+      // Tier 2 — hay + note dance reward
+      { minTier: 2, w: 16, fn: () => {
+        const obs = [this.makeObstacle("hay", baseX)];
+        const foods = [{ kind: "note" as FoodKind, x: baseX + 30 * u, y: this.groundY - 155 * u }];
+        return { obs, foods, gap: 2.0 };
+      }},
+      // Tier 2 — staircase butterflies
+      { minTier: 1, w: 18, fn: () => {
+        const foods: { kind: FoodKind; x: number; y: number }[] = [];
+        for (let i = 0; i < 5; i++) {
+          foods.push({
+            kind: "butterfly",
+            x: baseX + i * 50 * u,
+            y: this.groundY - (70 + i * 26) * u,
+          });
+        }
+        return { obs: [], foods, gap: 1.2 };
+      }},
+      // Tier 3 — double fence with corn slow-mo reward
+      { minTier: 3, w: 14, fn: () => {
+        const gap = rand(150, 180) * u;
+        const obs = [
+          this.makeObstacle("fence", baseX),
+          this.makeObstacle("fence", baseX + gap + 46 * u),
+        ];
+        const foods = [{ kind: "corn" as FoodKind, x: baseX + gap / 2 + 20 * u, y: this.groundY - 50 * u }];
+        return { obs, foods, gap: 2.1 };
+      }},
+      // Tier 3 — egg in the sky (fly reward)
+      { minTier: 2, w: 10, fn: () => {
+        const foods = [{ kind: "egg" as FoodKind, x: baseX + 80 * u, y: this.groundY - 200 * u }];
+        return { obs: [], foods, gap: 1.4 };
+      }},
+      // Tier 0 — apple (life)
+      { minTier: 0, w: 8, fn: () => {
+        const foods = [{ kind: "apple" as FoodKind, x: baseX + 80 * u, y: this.groundY - 26 * u }];
+        return { obs: [], foods, gap: 1.3 };
+      }},
+    ];
+
+    const eligible = patterns.filter((p) => p.minTier <= tier && (p.maxTier === undefined || p.maxTier >= tier));
+    const totalW = eligible.reduce((s, p) => s + p.w, 0);
+    let r = Math.random() * totalW;
+    let chosen = eligible[0];
+    for (const p of eligible) {
+      r -= p.w;
+      if (r <= 0) { chosen = p; break; }
+    }
+    const result = chosen.fn();
+    for (const o of result.obs) this.obstacles.push(o);
+    for (const f of result.foods) {
+      this.foods.push({ kind: f.kind, x: f.x, y: f.y, phase: rand(0, 6) });
+    }
+    // gap scales slightly with difficulty; very generous at start
+    const earlyMul = elapsed < 6 ? 1.45 : elapsed < 15 ? 1.15 : 1;
+    const gapMul = Math.max(0.82, 1 - elapsed * 0.0025) * earlyMul;
+    // if no obstacles in pattern, give breathing room
+    const baseGap = result.obs.length === 0 ? Math.max(result.gap, 0.9) : result.gap;
+    this.obsT = baseGap * gapMul + rand(-0.1, 0.1);
+    this.foodT = rand(0.7, 1.3);
+  }
+
+  private spawnFoodChain() {
+    // Occasional bonus food chains between patterns (decorative)
+    const u = this.u;
+    if (Math.random() < 0.55) {
+      this.foodT = rand(0.55, 0.9);
+      return;
+    }
+    const baseX = this.W + rand(40, 120) * u;
+    const kind: FoodKind = Math.random() < 0.5 ? "beetle" : "worm";
+    const count = Math.floor(rand(3, 5));
+    for (let i = 0; i < count; i++) {
+      this.foods.push({
+        kind,
+        x: baseX + i * 48 * u,
+        y: this.groundY - 26 * u,
+        phase: rand(0, 6),
+      });
+    }
+    this.foodT = rand(1.1, 1.8);
   }
 
   /* ── actions ─────────────────────────────────── */

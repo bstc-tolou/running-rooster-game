@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Engine, faNum } from "./game/engine";
-import type { HudData, FoodKind } from "./game/engine";
+import { Engine, faNum, CHAR_NAMES, CHAR_XP_NEED, CHAR_STAGES } from "./game/engine";
+import type { HudData, FoodKind, CharStage } from "./game/engine";
 
 /* ── tiny inline SVG icon set (no emoji, no assets) ───────────── */
 function FoodIcon({ kind, size = 34 }: { kind: FoodKind; size?: number }) {
@@ -222,6 +222,33 @@ export default function App() {
                 {[0, 1, 2].map((i) => (
                   <Heart key={i} on={i < hud.lives} />
                 ))}
+              </div>
+              {/* Character stage + XP bar */}
+              <div className="hud-panel px-3 py-2 min-w-[140px]">
+                <div className="text-[11px] text-[#ffd700]/80 font-bold leading-none mb-1.5">
+                  {CHAR_NAMES[hud.charStage]}
+                </div>
+                <div className="w-full h-2 bg-[#2a1a0a] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#ffd700] to-[#ff8c00] transition-all duration-300"
+                    style={{
+                      width: (() => {
+                        const idx = CHAR_STAGES.indexOf(hud.charStage);
+                        if (idx >= CHAR_STAGES.length - 1) return "100%";
+                        const cur = hud.xp - CHAR_XP_NEED[idx];
+                        const need = CHAR_XP_NEED[idx + 1] - CHAR_XP_NEED[idx];
+                        return `${Math.min(100, (cur / need) * 100)}%`;
+                      })(),
+                    }}
+                  />
+                </div>
+                <div className="text-[9px] text-[#ffd700]/60 mt-1 text-center">
+                  {(() => {
+                    const idx = CHAR_STAGES.indexOf(hud.charStage);
+                    if (idx >= CHAR_STAGES.length - 1) return faNum(hud.xp) + " XP";
+                    return faNum(hud.xp) + " / " + faNum(CHAR_XP_NEED[idx + 1]) + " XP";
+                  })()}
+                </div>
               </div>
               <button
                 aria-label="صدا"
